@@ -184,6 +184,7 @@ test pg_sampletolog               ... ok
   * Add extension to [PGXN](https://pgxn.org)
   * Add debian packages
   * Add centos packges
+  * Log statements by their queryid
 
 ## Author
 

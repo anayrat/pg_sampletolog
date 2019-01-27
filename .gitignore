@@ -7,3 +7,5 @@
 .deps/
 results/
 *.bc
+*.diffs
+*.out
