@@ -1,0 +1,56 @@
+load 'pg_sampletolog';
+set client_min_messages to LOG;
+set pg_sampletolog.disable_log_duration to on;
+set pg_sampletolog.statement_sample_rate to 1;
+select 1;
+LOG:  Sampled query - select 1;
+ ?column? 
+----------
+        1
+(1 row)
+
+set pg_sampletolog.statement_sample_rate to 0;
+set pg_sampletolog.transaction_sample_rate to 1;
+select 1;
+LOG:  Sampled transaction - select 1;
+ ?column? 
+----------
+        1
+(1 row)
+
+set pg_sampletolog.transaction_sample_rate to 0;
+set pg_sampletolog.log_statement = ddl;
+create table t1(c1 int);
+LOG:  Sampled ddl create table t1(c1 int);
+insert into t1 values (1);
+set pg_sampletolog.log_statement = mod;
+insert into t1 values (1);
+LOG:  Sampled query - insert into t1 values (1);
+drop table if exists t1;
+LOG:  Sampled ddl drop table if exists t1;
+set pg_sampletolog.log_before_execution to on;
+set pg_sampletolog.statement_sample_rate to 1;
+select 1;
+LOG:  Sampled query - select 1;
+ ?column? 
+----------
+        1
+(1 row)
+
+set pg_sampletolog.statement_sample_rate to 0;
+set pg_sampletolog.transaction_sample_rate to 1;
+select 1;
+LOG:  Sampled transaction - select 1;
+ ?column? 
+----------
+        1
+(1 row)
+
+set pg_sampletolog.transaction_sample_rate to 0;
+set pg_sampletolog.log_statement = ddl;
+create table t1(c1 int);
+LOG:  Sampled ddl create table t1(c1 int);
+insert into t1 values (1);
+set pg_sampletolog.log_statement = mod;
+insert into t1 values (1);
+LOG:  Sampled query - insert into t1 values (1);
