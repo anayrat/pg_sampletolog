@@ -1,12 +1,14 @@
 /*-------------------------------------------------------------------------
  *
- * pgsl.c
+ * pg_sampletolog is a PostgreSQL extension which allows to sample
+ * statements and/or transactions to logs.
  *
+ * Portions of code inspired by auto_explain contrib.
+ *
+ * This program is open source, licensed under the PostgreSQL license.
+ * For license terms, see the LICENSE file.
  *
  * Copyright (c) 2019, Adrien Nayrat adrien.nayrat@gmail.com
- *
- * IDENTIFICATION
- *	  contrib/pgsl/pgexl.c
  *
  *-------------------------------------------------------------------------
  */
@@ -133,7 +135,7 @@ _PG_init(void)
 	/* Define custom GUC variables. */
 	DefineCustomRealVariable("pg_sampletolog.statement_sample_rate",
 				 "Fraction of queries to log",
-				 "Use a value between 0.0 (never log) and 1.0 (always log).",
+		"Use a value between 0.0 (never log) and 1.0 (always log).",
 				 &pgsl_stmt_sample_rate,
 				 0.0,
 				 0.0,
@@ -146,7 +148,7 @@ _PG_init(void)
 
 	DefineCustomRealVariable("pg_sampletolog.transaction_sample_rate",
 				 "Fraction of transactions to log",
-				 "Use a value between 0.0 (never log) and 1.0 (always log).",
+		"Use a value between 0.0 (never log) and 1.0 (always log).",
 				 &pgsl_transaction_sample_rate,
 				 0.0,
 				 0.0,
@@ -193,7 +195,7 @@ _PG_init(void)
 				 NULL);
 
 	DefineCustomBoolVariable("pg_sampletolog.disable_log_duration",
-			     "Disable duration in log, used for testing.",
+			       "Disable duration in log, used for testing.",
 				 NULL,
 				 &pgsl_disable_log_duration,
 				 false,
@@ -371,16 +373,14 @@ pgsl_ExecutorStart(QueryDesc * queryDesc, int eflags)
 	/* Determine if statement of this transaction is sampled */
 	if (pgsl_stmt_sample_rate > 0 && pgsl_nesting_level == 0)
 		pgsl_query_issampled |= pgsl_query_issampled || (pgsl_stmt_sample_rate == 1 ||
-					      (random() < pgsl_stmt_sample_rate *
-					       MAX_RANDOM_VALUE));
+		     (random() < pgsl_stmt_sample_rate * MAX_RANDOM_VALUE));
 
 	/* Determine if this transaction is a new one */
 	if ((pgsl_transaction_sample_rate > 0 || pgsl_transaction_issampled) &&
 	    pgsl_nesting_level == 0 && pgsl_previouslxid != MyProc->lxid) {
 		/* It is a new transaction, so determine if it is sampled */
 		pgsl_transaction_issampled = pgsl_transaction_sample_rate == 1 ||
-			(random() < pgsl_transaction_sample_rate *
-			 MAX_RANDOM_VALUE);
+			(random() < pgsl_transaction_sample_rate * MAX_RANDOM_VALUE);
 		pgsl_previouslxid = MyProc->lxid;
 	}
 
