@@ -18,16 +18,47 @@ LOG:  Sampled transaction - select 1;
         1
 (1 row)
 
+BEGIN;
+LOG:  Sampled transaction - BEGIN;
+SELECT 1;
+LOG:  Sampled transaction - SELECT 1;
+ ?column? 
+----------
+        1
+(1 row)
+
+create table t1(c1 int);
+LOG:  Sampled transaction - create table t1(c1 int);
+drop table t1;
+LOG:  Sampled transaction - drop table t1;
+COMMIT;
+LOG:  Sampled transaction - COMMIT;
+BEGIN;
+LOG:  Sampled transaction - BEGIN;
+SELECT 1;
+LOG:  Sampled transaction - SELECT 1;
+ ?column? 
+----------
+        1
+(1 row)
+
+create table t1(c1 int);
+LOG:  Sampled transaction - create table t1(c1 int);
+drop table t1;
+LOG:  Sampled transaction - drop table t1;
+ROLLBACK;
+LOG:  Sampled transaction - ROLLBACK;
 set pg_sampletolog.transaction_sample_rate to 0;
+LOG:  Sampled transaction - set pg_sampletolog.transaction_sample_rate to 0;
 set pg_sampletolog.log_statement = ddl;
 create table t1(c1 int);
-LOG:  Sampled ddl create table t1(c1 int);
+LOG:  Sampled ddl - create table t1(c1 int);
 insert into t1 values (1);
 set pg_sampletolog.log_statement = mod;
 insert into t1 values (1);
 LOG:  Sampled query - insert into t1 values (1);
 drop table if exists t1;
-LOG:  Sampled ddl drop table if exists t1;
+LOG:  Sampled ddl - drop table if exists t1;
 set pg_sampletolog.log_before_execution to on;
 set pg_sampletolog.statement_sample_rate to 1;
 select 1;
@@ -46,10 +77,41 @@ LOG:  Sampled transaction - select 1;
         1
 (1 row)
 
+BEGIN;
+LOG:  Sampled transaction - BEGIN;
+SELECT 1;
+LOG:  Sampled transaction - SELECT 1;
+ ?column? 
+----------
+        1
+(1 row)
+
+create table t1(c1 int);
+LOG:  Sampled transaction - create table t1(c1 int);
+drop table t1;
+LOG:  Sampled transaction - drop table t1;
+COMMIT;
+LOG:  Sampled transaction - COMMIT;
+BEGIN;
+LOG:  Sampled transaction - BEGIN;
+SELECT 1;
+LOG:  Sampled transaction - SELECT 1;
+ ?column? 
+----------
+        1
+(1 row)
+
+create table t1(c1 int);
+LOG:  Sampled transaction - create table t1(c1 int);
+drop table t1;
+LOG:  Sampled transaction - drop table t1;
+ROLLBACK;
+LOG:  Sampled transaction - ROLLBACK;
 set pg_sampletolog.transaction_sample_rate to 0;
+LOG:  Sampled transaction - set pg_sampletolog.transaction_sample_rate to 0;
 set pg_sampletolog.log_statement = ddl;
 create table t1(c1 int);
-LOG:  Sampled ddl create table t1(c1 int);
+LOG:  Sampled ddl - create table t1(c1 int);
 insert into t1 values (1);
 set pg_sampletolog.log_statement = mod;
 insert into t1 values (1);

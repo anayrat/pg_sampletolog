@@ -155,7 +155,7 @@ It is useful to get query's parameters from a query you identified in pg_stat_st
 
 *No supported*:
 
-  * PREPARE statements are not (yet) supported.
+  * PREPARE statements are not supported.
 
 ## Testing
 
@@ -176,6 +176,15 @@ test pg_sampletolog               ... ok
 =====================
  All 1 tests passed. 
 =====================
+```
+
+## Misc
+
+Regex to remove prefix added by `pg_sampletolog` and replace it by `statement:` (same prefix as log_statement):
+
+
+```
+sed -r 's/Sampled (query|ddl|transaction) - (Duration: [0-9]*\.[0-9]* ms)?( - )?(queryid = -?[0-9]*)?( - )?/statement: /g' inputlog.csv > output.log
 ```
 
 

@@ -124,6 +124,7 @@ static void	pgsl_ExecutorFinish(QueryDesc * queryDesc);
 static void	pgsl_ExecutorEnd(QueryDesc * queryDesc);
 
 static void	pgsl_log_report(QueryDesc * queryDesc);
+static void	pgsl_check_transaction_issampled(void);
 
 
 /*
@@ -257,7 +258,7 @@ pgsl_log_report(QueryDesc * queryDesc)
 	/* Log duration and/or queryid if available */
 	if (queryDesc->totaltime != NULL && !pgsl_disable_log_duration) {
 		if (queryDesc->plannedstmt->queryId) {
-			snprintf(message, 70, "duration: %.3f ms - queryid = %ld ",
+			snprintf(message, 70, "- Duration: %.3f ms - queryid = %ld ",
 				 queryDesc->totaltime->total * 1000.0,
 #if PG_VERSION_NUM >= 110000
 				 queryDesc->plannedstmt->queryId);
@@ -265,11 +266,11 @@ pgsl_log_report(QueryDesc * queryDesc)
 				 (uint64) queryDesc->plannedstmt->queryId);
 #endif
 		} else {
-			snprintf(message, 70, "duration: %.3f ms ",
+			snprintf(message, 70, "- Duration: %.3f ms ",
 				 queryDesc->totaltime->total * 1000.0);
 		}
 	} else if (queryDesc->plannedstmt->queryId) {
-		snprintf(message, 70, "queryid = %ld ",
+		snprintf(message, 70, "- queryid = %ld ",
 #if PG_VERSION_NUM >= 110000
 			 queryDesc->plannedstmt->queryId);
 #else
@@ -297,7 +298,18 @@ pgsl_log_report(QueryDesc * queryDesc)
 	}
 }
 
-
+void
+pgsl_check_transaction_issampled(void)
+{
+	/* Determine if this transaction is a new one */
+	if ((pgsl_transaction_sample_rate > 0 || pgsl_transaction_issampled) &&
+	    pgsl_nesting_level == 0 && pgsl_previouslxid != MyProc->lxid) {
+		/* It is a new transaction, so determine if it is sampled */
+		pgsl_transaction_issampled = pgsl_transaction_sample_rate == 1 ||
+			(random() < pgsl_transaction_sample_rate * MAX_RANDOM_VALUE);
+		pgsl_previouslxid = MyProc->lxid;
+	}
+}
 
 /*
  * ProcessUtility hook: We check if statement is a DDL
@@ -319,17 +331,26 @@ pgsl_ProcessUtility(
 		    char *completionTag)
 {
 
+	pgsl_check_transaction_issampled();
 
-#if PG_VERSION_NUM >= 100000
-	if (GetCommandLogLevel((Node *) pstmt) <= pgsl_log_statement)
-#else
-	if (GetCommandLogLevel(parsetree) <= pgsl_log_statement)
-#endif
-	{
+	if (pgsl_transaction_issampled) {
 		ereport(pgsl_log_level,
-			(errmsg("Sampled ddl %s",
+			(errmsg("Sampled transaction - %s",
 				queryString),
 			 errhidestmt(true)));
+
+	} else {
+#if PG_VERSION_NUM >= 100000
+		if (GetCommandLogLevel((Node *) pstmt) <= pgsl_log_statement)
+#else
+		if (GetCommandLogLevel(parsetree) <= pgsl_log_statement)
+#endif
+		{
+			ereport(pgsl_log_level,
+				(errmsg("Sampled ddl - %s",
+					queryString),
+				 errhidestmt(true)));
+		}
 	}
 
 	if (prev_ProcessUtility)
@@ -375,14 +396,7 @@ pgsl_ExecutorStart(QueryDesc * queryDesc, int eflags)
 		pgsl_query_issampled |= pgsl_query_issampled || (pgsl_stmt_sample_rate == 1 ||
 		     (random() < pgsl_stmt_sample_rate * MAX_RANDOM_VALUE));
 
-	/* Determine if this transaction is a new one */
-	if ((pgsl_transaction_sample_rate > 0 || pgsl_transaction_issampled) &&
-	    pgsl_nesting_level == 0 && pgsl_previouslxid != MyProc->lxid) {
-		/* It is a new transaction, so determine if it is sampled */
-		pgsl_transaction_issampled = pgsl_transaction_sample_rate == 1 ||
-			(random() < pgsl_transaction_sample_rate * MAX_RANDOM_VALUE);
-		pgsl_previouslxid = MyProc->lxid;
-	}
+	pgsl_check_transaction_issampled();
 
 	/* Always log if statement level <= pg_sampletolog.log_statement   */
 	if (!pgsl_query_issampled && GetCommandLogLevel((Node *) queryDesc->plannedstmt) <= pgsl_log_statement)
