@@ -1,0 +1,43 @@
+{
+   "name": "pg_sampletolog",
+   "abstract": "An extension to sample statements or transactions to logs",
+   "version": "__VERSION__",
+   "maintainer": "Adrien Nayrat <adrien.nayrat@anayrat.info>",
+   "license": "postgresql",
+   "release_status": "testing",
+   "provides": {
+      "pg_stat_kcache": {
+         "abstract": "An extension to sample statements or transactions to logs",
+         "file": "pg_sampletolog.c",
+         "docfile": "README.md",
+         "version": "__VERSION__"
+      }
+   },
+   "resources": {
+      "bugtracker": {
+         "web": "https://github.com/anayrat/pg_sampletolog/issues"
+      },
+      "repository": {
+        "url":  "git@github.com:anayrat/pg_sampletolog.git",
+        "web":  "https://github.com/anayrat/pg_sampletolog",
+        "type": "git"
+      }
+   },
+   "prereqs": {
+       "runtime": {
+           "requires": {
+               "PostgreSQL": "9.4.0"
+           }
+       }
+   },
+   "generated_by": "Adrien Nayrat",
+   "meta-spec": {
+      "version": "1.0.0",
+      "url": "http://pgxn.org/meta/spec.txt"
+   },
+   "tags": [
+      "logging",
+      "log",
+      "sampling"
+   ]
+}
