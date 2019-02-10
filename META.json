@@ -6,7 +6,7 @@
    "license": "postgresql",
    "release_status": "testing",
    "provides": {
-      "pg_stat_kcache": {
+      "pg_sampletolog": {
          "abstract": "An extension to sample statements or transactions to logs",
          "file": "pg_sampletolog.c",
          "docfile": "README.md",
@@ -18,7 +18,7 @@
          "web": "https://github.com/anayrat/pg_sampletolog/issues"
       },
       "repository": {
-        "url":  "git@github.com:anayrat/pg_sampletolog.git",
+        "url":  "https://github.com/anayrat/pg_sampletolog.git",
         "web":  "https://github.com/anayrat/pg_sampletolog",
         "type": "git"
       }
