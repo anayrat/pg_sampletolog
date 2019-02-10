@@ -1,0 +1,55 @@
+Source: pg-sampletolog
+Section: database
+Priority: optional
+Maintainer: Adrien Nayrat <adrien.nayrat@anayrat.info>
+Standards-Version: 4.1.3
+Build-Depends: debhelper (>=9~), postgresql-server-dev-all (>= 141~)
+Homepage: https://github.com/anayrat/pg_sampletolog
+Vcs-Browser: https://github.com/anayrat/pg_sampletolog
+Vcs-Git: https://github.com/anayrat/pg_sampletolog.git
+
+Package: postgresql-9.4-pg-sampletolog
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}, postgresql-9.4,
+ postgresql-contrib-9.4
+Description: Postgres extension to sample statements or transactions to logs.
+ pg_sampletolog is a PostgreSQL extension which allows to sample statements
+ and/or transactions to logs. It add in PostgreSQL (from 9.4 to 11) same kind
+ of statement sampling added in PostgreSQL 12 (currently not released)
+
+Package: postgresql-9.5-pg-sampletolog
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}, postgresql-9.5,
+ postgresql-contrib-9.5
+Description: Postgres extension to sample statements or transactions to logs.
+ pg_sampletolog is a PostgreSQL extension which allows to sample statements
+ and/or transactions to logs. It add in PostgreSQL (from 9.4 to 11) same kind
+ of statement sampling added in PostgreSQL 12 (currently not released)
+
+Package: postgresql-9.6-pg-sampletolog
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}, postgresql-9.6,
+ postgresql-contrib-9.6
+Description: Postgres extension to sample statements or transactions to logs.
+ pg_sampletolog is a PostgreSQL extension which allows to sample statements
+ and/or transactions to logs. It add in PostgreSQL (from 9.4 to 11) same kind
+ of statement sampling added in PostgreSQL 12 (currently not released)
+
+Package: postgresql-10-pg-sampletolog
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}, postgresql-10,
+ postgresql-contrib-10
+Description: Postgres extension to sample statements or transactions to logs.
+ pg_sampletolog is a PostgreSQL extension which allows to sample statements
+ and/or transactions to logs. It add in PostgreSQL (from 9.4 to 11) same kind
+ of statement sampling added in PostgreSQL 12 (currently not released)
+
+Package: postgresql-11-pg-sampletolog
+Architecture: any
+Depends: ${misc:Depends}, ${shlibs:Depends}, postgresql-11,
+ postgresql-contrib-11
+Description: Postgres extension to sample statements or transactions to logs.
+ pg_sampletolog is a PostgreSQL extension which allows to sample statements
+ and/or transactions to logs. It add in PostgreSQL (from 9.4 to 11) same kind
+ of statement sampling added in PostgreSQL 12 (currently not released)
+

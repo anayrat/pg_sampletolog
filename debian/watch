@@ -1,0 +1,3 @@
+version=3
+opts="uversionmangle=s/_/./g" \
+  https://github.com/anayrat/pg_sampletolog/releases .*/archive/REL(.*).tar.gz
