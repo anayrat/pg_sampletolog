@@ -189,9 +189,6 @@ sed -r 's/Sampled (query|ddl|transaction) - (Duration: [0-9]*\.[0-9]* ms)?( - )?
 
 ## TODO
 
-  * Add extension to [PGXN](https://pgxn.org)
-  * Add debian packages
-  * Add centos packges
   * Log statements by their queryid
 
 ## Author
