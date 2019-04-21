@@ -11,7 +11,6 @@ pg_sampletolog allows to:
   * Log statement's queryid if [pg_stat_statements](https://www.postgresql.org/docs/current/pgstatstatements.html) is installed
 
 
-*As it is a recent release, do not use in production. But feedbacks are welcome ;)*
 
 ## Installation
 

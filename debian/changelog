@@ -1,3 +1,9 @@
+pg-sampletolog (1.0.0-1) unstable; urgency=medium
+
+  * No significant change, just release as stable
+
+ -- Adrien Nayrat <adrien.nayrat@anayrat.info>  Sun, 21 Apr 2019 09:14:28 +0000
+
 pg-sampletolog (0.0.2-1) unstable; urgency=low
 
   * Initial release.

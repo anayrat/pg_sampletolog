@@ -4,7 +4,7 @@
    "version": "__VERSION__",
    "maintainer": "Adrien Nayrat <adrien.nayrat@anayrat.info>",
    "license": "postgresql",
-   "release_status": "testing",
+   "release_status": "stable",
    "provides": {
       "pg_sampletolog": {
          "abstract": "An extension to sample statements or transactions to logs",
