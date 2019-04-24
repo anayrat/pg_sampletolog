@@ -1,6 +1,6 @@
 # pg_sampletolog
 
-pg_sampletolog is a PostgreSQL extension which allows to sample statements and/or transactions to logs. It add in PostgreSQL (from 9.4 to 11) same kind of statement sampling added in PostgreSQL 12 (currently not released).
+pg_sampletolog is a PostgreSQL extension which allows to sample statements and/or transactions to logs. It adds in PostgreSQL (from 9.4 to 11) same kind of statement sampling added in PostgreSQL 12 (currently not released).
 
 pg_sampletolog allows to:
 
@@ -71,7 +71,7 @@ pg_sampelog will log arround 10% of statements. It will do computation for each 
 2019-01-27 12:50:39.361 CET [27047] LOG:  Sampled query duration: 0.014 ms - SELECT 1;
 ```
 
-  * Log only 10 of transactions: `pg_sampletolog.transaction_sample_rate = 0.1`
+  * Log only 10% of transactions: `pg_sampletolog.transaction_sample_rate = 0.1`
 
 Same as previous, with the difference that, when a transaction starts, pg_sampletolog will choose if the transaction will be logged. When a transaction is logged, **all** statements of the transaction are logged.
 
