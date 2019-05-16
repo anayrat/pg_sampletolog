@@ -19,11 +19,14 @@
 
 #include "tcop/tcopprot.h"
 #include "tcop/utility.h"
-#include "executor/instrument.h"
 #include "utils/guc.h"
 #if PG_VERSION_NUM >= 90600
 #include "access/parallel.h"
 #endif
+
+/* to log statement duration */
+#include <utils/timestamp.h>
+#include <access/xact.h>
 
 PG_MODULE_MAGIC;
 
@@ -256,18 +259,25 @@ pgsl_log_report(QueryDesc * queryDesc)
 	char		message[70];
 
 	/* Log duration and/or queryid if available */
-	if (queryDesc->totaltime != NULL && !pgsl_disable_log_duration) {
+	if (!pgsl_disable_log_duration) {
+		long            secs;
+		int             usecs;
+		int             msecs;
+
+		TimestampDifference(GetCurrentStatementStartTimestamp(), GetCurrentTimestamp(), &secs, &usecs);
+		msecs = usecs / 1000;
+
 		if (queryDesc->plannedstmt->queryId) {
-			snprintf(message, 70, "- Duration: %.3f ms - queryid = %ld ",
-				 queryDesc->totaltime->total * 1000.0,
+			snprintf(message, 70, "- Duration: %ld.%03d ms - queryid = %ld ",
+				 secs * 1000 + msecs, usecs % 1000,
 #if PG_VERSION_NUM >= 110000
 				 queryDesc->plannedstmt->queryId);
 #else
 				 (uint64) queryDesc->plannedstmt->queryId);
 #endif
 		} else {
-			snprintf(message, 70, "- Duration: %.3f ms ",
-				 queryDesc->totaltime->total * 1000.0);
+			snprintf(message, 70, "- Duration: %ld.%03d ms ",
+				 secs * 1000 + msecs, usecs % 1000);
 		}
 	} else if (queryDesc->plannedstmt->queryId) {
 		snprintf(message, 70, "- queryid = %ld ",
@@ -411,22 +421,6 @@ pgsl_ExecutorStart(QueryDesc * queryDesc, int eflags)
 		prev_ExecutorStart(queryDesc, eflags);
 	else
 		standard_ExecutorStart(queryDesc, eflags);
-
-	if (!pgsl_log_before_execution &&
-	    (pgsl_query_issampled || pgsl_transaction_issampled)) {
-		/*
-		 * (From auto_explain) Set up to track total elapsed time in
-		 * ExecutorRun.  Make sure the space is allocated in the
-		 * per-query context so it will go away at ExecutorEnd.
-		 */
-		if (queryDesc->totaltime == NULL) {
-			MemoryContext	oldcxt;
-
-			oldcxt = MemoryContextSwitchTo(queryDesc->estate->es_query_cxt);
-			queryDesc->totaltime = InstrAlloc(1, INSTRUMENT_ALL);
-			MemoryContextSwitchTo(oldcxt);
-		}
-	}
 }
 
 
@@ -501,14 +495,9 @@ pgsl_ExecutorFinish(QueryDesc * queryDesc)
 static void
 pgsl_ExecutorEnd(QueryDesc * queryDesc)
 {
-	if (queryDesc->totaltime && !pgsl_log_before_execution &&
-	    (pgsl_query_issampled || pgsl_transaction_issampled)) {
-		/*
-		 * (From auto_explain) Make sure stats accumulation is done.
-		 * (Note: it's okay if several levels of hook all do this.)
-		 */
-		InstrEndLoop(queryDesc->totaltime);
-
+	if (!pgsl_log_before_execution &&
+			(pgsl_query_issampled || pgsl_transaction_issampled))
+	{
 		pgsl_log_report(queryDesc);
 	}
 	if (prev_ExecutorEnd)
