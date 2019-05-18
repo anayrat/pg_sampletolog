@@ -20,6 +20,7 @@
 #include "tcop/tcopprot.h"
 #include "tcop/utility.h"
 #include "utils/guc.h"
+#include "utils/snapmgr.h"
 #if PG_VERSION_NUM >= 90600
 #include "access/parallel.h"
 #endif
@@ -129,6 +130,7 @@ static void	pgsl_ExecutorEnd(QueryDesc * queryDesc);
 static void	pgsl_log_report(QueryDesc * queryDesc);
 static void	pgsl_check_transaction_issampled(void);
 
+static char   * pgsl_get_duration(void);
 
 /*
  * Module load callback
@@ -251,6 +253,25 @@ _PG_fini(void)
 #endif
 }
 
+static char *
+pgsl_get_duration(void)
+{
+	char		*duration = NULL;
+	long            secs;
+	int             usecs;
+	int             msecs;
+
+	duration = palloc(sizeof(char) * 32);
+
+	if (!pgsl_disable_log_duration)
+	{
+		TimestampDifference(GetCurrentStatementStartTimestamp(), GetCurrentTimestamp(), &secs, &usecs);
+		msecs = usecs / 1000;
+		snprintf(duration, 30, " duration: %ld.%03d ms ", secs * 1000 + msecs, usecs % 1000);
+	}
+
+	return duration;
+}
 
 void
 pgsl_log_report(QueryDesc * queryDesc)
@@ -259,52 +280,29 @@ pgsl_log_report(QueryDesc * queryDesc)
 	char		message[70];
 
 	/* Log duration and/or queryid if available */
-	if (!pgsl_disable_log_duration) {
-		long            secs;
-		int             usecs;
-		int             msecs;
-
-		TimestampDifference(GetCurrentStatementStartTimestamp(), GetCurrentTimestamp(), &secs, &usecs);
-		msecs = usecs / 1000;
-
-		if (queryDesc->plannedstmt->queryId) {
-			snprintf(message, 70, "- Duration: %ld.%03d ms - queryid = %ld ",
-				 secs * 1000 + msecs, usecs % 1000,
+	if (queryDesc->plannedstmt->queryId) {
+		snprintf(message, 70, "%s statement: /* queryid = %ld */",
+				pgsl_get_duration(),
 #if PG_VERSION_NUM >= 110000
 				 queryDesc->plannedstmt->queryId);
 #else
 				 (uint64) queryDesc->plannedstmt->queryId);
 #endif
-		} else {
-			snprintf(message, 70, "- Duration: %ld.%03d ms ",
-				 secs * 1000 + msecs, usecs % 1000);
-		}
-	} else if (queryDesc->plannedstmt->queryId) {
-		snprintf(message, 70, "- queryid = %ld ",
-#if PG_VERSION_NUM >= 110000
-			 queryDesc->plannedstmt->queryId);
-#else
-			 (uint64) queryDesc->plannedstmt->queryId);
-#endif
 	} else {
-		*message = '\0';
+		snprintf(message, 70, "%s statement:", pgsl_get_duration());
 	}
 
 	/*
 	 * We emit different message depending on whether logging is
 	 * triggered by query sampling or by transaction sampling.
 	 */
-	if (pgsl_query_issampled) {
+	if (pgsl_query_issampled || pgsl_transaction_issampled)
+	{
 		ereport(pgsl_log_level,
-			(errmsg("Sampled query %s- %s",
+			(errmsg(" %s %s",
 				message, queryDesc->sourceText),
 			 errhidestmt(true)));
 		pgsl_query_issampled = false;
-	} else if (pgsl_transaction_issampled) {
-		ereport(pgsl_log_level,
-			(errmsg("Sampled transaction %s- %s",
-				message, queryDesc->sourceText),
-			 errhidestmt(true)));
 	}
 }
 
@@ -340,26 +338,41 @@ pgsl_ProcessUtility(
 		    DestReceiver * dest,
 		    char *completionTag)
 {
+	QueryDesc  *queryDesc;
+#if PG_VERSION_NUM < 100000
+	PlannedStmt *pstmt;
+#endif
 
 	pgsl_check_transaction_issampled();
 
-	if (pgsl_transaction_issampled) {
-		ereport(pgsl_log_level,
-			(errmsg("Sampled transaction - %s",
-				queryString),
-			 errhidestmt(true)));
+	/* Create a QueryDesc */
+	queryDesc = CreateQueryDesc( pstmt, queryString, GetActiveSnapshot(), InvalidSnapshot, dest, NULL, NULL, 0);
 
-	} else {
-#if PG_VERSION_NUM >= 100000
-		if (GetCommandLogLevel((Node *) pstmt) <= pgsl_log_statement)
-#else
-		if (GetCommandLogLevel(parsetree) <= pgsl_log_statement)
-#endif
-		{
-			ereport(pgsl_log_level,
-				(errmsg("Sampled ddl - %s",
+	if (pgsl_transaction_issampled)
+	{
+		pgsl_log_report(queryDesc);
+		/*
+		ereport(pgsl_log_level,
+				(errmsg("%s statement: %s", pgsl_get_duration(),
 					queryString),
 				 errhidestmt(true)));
+		 */
+	}
+	else
+	{
+#if PG_VERSION_NUM >= 100000
+		if (GetCommandLogLevel((Node *) pstmt) <= pgsl_log_statement || pgsl_stmt_sample_rate == 1)
+#else
+		if (GetCommandLogLevel(parsetree) <= pgsl_log_statement || pgsl_stmt_sample_rate == 1)
+#endif
+		{
+			pgsl_log_report(queryDesc);
+			/*
+			ereport(pgsl_log_level,
+					(errmsg("%s statement: %s", pgsl_get_duration(),
+						queryString),
+					 errhidestmt(true)));
+			 */
 		}
 	}
 
