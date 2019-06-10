@@ -261,9 +261,7 @@ pgsl_get_duration(void)
 	int             usecs;
 	int             msecs;
 
-	duration = palloc(sizeof(char) * 32);
-	memset(duration, 0, strlen(duration));
-
+	duration = palloc0(sizeof(char) * 32);
 
 	if (!pgsl_disable_log_duration)
 	{

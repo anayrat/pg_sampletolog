@@ -1,9 +1,7 @@
 load 'pg_sampletolog';
 set client_min_messages to LOG;
 set pg_sampletolog.disable_log_duration to on;
-LOG:  duration: 0.016 ms  statement: set pg_sampletolog.disable_log_duration to on;
 set pg_sampletolog.statement_sample_rate to 1;
-LOG:  statement: set pg_sampletolog.statement_sample_rate to 1;
 select 1;
 LOG:  statement: select 1;
  ?column? 
@@ -14,7 +12,6 @@ LOG:  statement: select 1;
 set pg_sampletolog.statement_sample_rate to 0;
 LOG:  statement: set pg_sampletolog.statement_sample_rate to 0;
 set pg_sampletolog.transaction_sample_rate to 1;
-LOG:  statement: set pg_sampletolog.transaction_sample_rate to 1;
 select 1;
 LOG:  statement: select 1;
  ?column? 
@@ -55,7 +52,6 @@ LOG:  statement: ROLLBACK;
 set pg_sampletolog.transaction_sample_rate to 0;
 LOG:  statement: set pg_sampletolog.transaction_sample_rate to 0;
 set pg_sampletolog.log_statement = ddl;
-LOG:  statement: set pg_sampletolog.log_statement = ddl;
 create table t1(c1 int);
 LOG:  statement: create table t1(c1 int);
 insert into t1 values (1);
