@@ -19,11 +19,15 @@
 
 #include "tcop/tcopprot.h"
 #include "tcop/utility.h"
-#include "executor/instrument.h"
 #include "utils/guc.h"
+#include "utils/snapmgr.h"
 #if PG_VERSION_NUM >= 90600
 #include "access/parallel.h"
 #endif
+
+/* to log statement duration */
+#include <utils/timestamp.h>
+#include <access/xact.h>
 
 PG_MODULE_MAGIC;
 
@@ -126,6 +130,7 @@ static void	pgsl_ExecutorEnd(QueryDesc * queryDesc);
 static void	pgsl_log_report(QueryDesc * queryDesc);
 static void	pgsl_check_transaction_issampled(void);
 
+static char   * pgsl_get_duration(void);
 
 /*
  * Module load callback
@@ -248,6 +253,25 @@ _PG_fini(void)
 #endif
 }
 
+static char *
+pgsl_get_duration(void)
+{
+	char		*duration = NULL;
+	long            secs;
+	int             usecs;
+	int             msecs;
+
+	duration = palloc0(sizeof(char) * 32);
+
+	if (!pgsl_disable_log_duration)
+	{
+		TimestampDifference(GetCurrentStatementStartTimestamp(), GetCurrentTimestamp(), &secs, &usecs);
+		msecs = usecs / 1000;
+		snprintf(duration, 30, "duration: %ld.%03d ms  ", secs * 1000 + msecs, usecs % 1000);
+	}
+	return duration;
+
+}
 
 void
 pgsl_log_report(QueryDesc * queryDesc)
@@ -256,45 +280,29 @@ pgsl_log_report(QueryDesc * queryDesc)
 	char		message[70];
 
 	/* Log duration and/or queryid if available */
-	if (queryDesc->totaltime != NULL && !pgsl_disable_log_duration) {
-		if (queryDesc->plannedstmt->queryId) {
-			snprintf(message, 70, "- Duration: %.3f ms - queryid = %ld ",
-				 queryDesc->totaltime->total * 1000.0,
+	if (queryDesc->plannedstmt->queryId) {
+		snprintf(message, 70, "%sstatement: /* queryid = %ld */",
+				pgsl_get_duration(),
 #if PG_VERSION_NUM >= 110000
 				 queryDesc->plannedstmt->queryId);
 #else
 				 (uint64) queryDesc->plannedstmt->queryId);
 #endif
-		} else {
-			snprintf(message, 70, "- Duration: %.3f ms ",
-				 queryDesc->totaltime->total * 1000.0);
-		}
-	} else if (queryDesc->plannedstmt->queryId) {
-		snprintf(message, 70, "- queryid = %ld ",
-#if PG_VERSION_NUM >= 110000
-			 queryDesc->plannedstmt->queryId);
-#else
-			 (uint64) queryDesc->plannedstmt->queryId);
-#endif
 	} else {
-		*message = '\0';
+		snprintf(message, 70, "%sstatement:", pgsl_get_duration());
 	}
 
 	/*
 	 * We emit different message depending on whether logging is
 	 * triggered by query sampling or by transaction sampling.
 	 */
-	if (pgsl_query_issampled) {
+	if (pgsl_query_issampled || pgsl_transaction_issampled)
+	{
 		ereport(pgsl_log_level,
-			(errmsg("Sampled query %s- %s",
+			(errmsg("%s %s",
 				message, queryDesc->sourceText),
 			 errhidestmt(true)));
 		pgsl_query_issampled = false;
-	} else if (pgsl_transaction_issampled) {
-		ereport(pgsl_log_level,
-			(errmsg("Sampled transaction %s- %s",
-				message, queryDesc->sourceText),
-			 errhidestmt(true)));
 	}
 }
 
@@ -330,26 +338,31 @@ pgsl_ProcessUtility(
 		    DestReceiver * dest,
 		    char *completionTag)
 {
+#if PG_VERSION_NUM < 100000
+	PlannedStmt *pstmt;
+#endif
 
 	pgsl_check_transaction_issampled();
 
-	if (pgsl_transaction_issampled) {
+	if (pgsl_transaction_issampled)
+	{
 		ereport(pgsl_log_level,
-			(errmsg("Sampled transaction - %s",
-				queryString),
-			 errhidestmt(true)));
-
-	} else {
+				(errmsg("%sstatement: %s", pgsl_get_duration(),
+					queryString),
+				 errhidestmt(true)));
+	}
+	else
+	{
 #if PG_VERSION_NUM >= 100000
-		if (GetCommandLogLevel((Node *) pstmt) <= pgsl_log_statement)
+		if (GetCommandLogLevel((Node *) pstmt) <= pgsl_log_statement || pgsl_stmt_sample_rate == 1)
 #else
-		if (GetCommandLogLevel(parsetree) <= pgsl_log_statement)
+		if (GetCommandLogLevel(parsetree) <= pgsl_log_statement || pgsl_stmt_sample_rate == 1)
 #endif
 		{
 			ereport(pgsl_log_level,
-				(errmsg("Sampled ddl - %s",
-					queryString),
-				 errhidestmt(true)));
+					(errmsg("%sstatement: %s", pgsl_get_duration(),
+						queryString),
+					 errhidestmt(true)));
 		}
 	}
 
@@ -411,22 +424,6 @@ pgsl_ExecutorStart(QueryDesc * queryDesc, int eflags)
 		prev_ExecutorStart(queryDesc, eflags);
 	else
 		standard_ExecutorStart(queryDesc, eflags);
-
-	if (!pgsl_log_before_execution &&
-	    (pgsl_query_issampled || pgsl_transaction_issampled)) {
-		/*
-		 * (From auto_explain) Set up to track total elapsed time in
-		 * ExecutorRun.  Make sure the space is allocated in the
-		 * per-query context so it will go away at ExecutorEnd.
-		 */
-		if (queryDesc->totaltime == NULL) {
-			MemoryContext	oldcxt;
-
-			oldcxt = MemoryContextSwitchTo(queryDesc->estate->es_query_cxt);
-			queryDesc->totaltime = InstrAlloc(1, INSTRUMENT_ALL);
-			MemoryContextSwitchTo(oldcxt);
-		}
-	}
 }
 
 
@@ -501,14 +498,9 @@ pgsl_ExecutorFinish(QueryDesc * queryDesc)
 static void
 pgsl_ExecutorEnd(QueryDesc * queryDesc)
 {
-	if (queryDesc->totaltime && !pgsl_log_before_execution &&
-	    (pgsl_query_issampled || pgsl_transaction_issampled)) {
-		/*
-		 * (From auto_explain) Make sure stats accumulation is done.
-		 * (Note: it's okay if several levels of hook all do this.)
-		 */
-		InstrEndLoop(queryDesc->totaltime);
-
+	if (!pgsl_log_before_execution &&
+			(pgsl_query_issampled || pgsl_transaction_issampled))
+	{
 		pgsl_log_report(queryDesc);
 	}
 	if (prev_ExecutorEnd)

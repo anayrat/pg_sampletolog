@@ -68,7 +68,7 @@ By default, pg_sampletolog is disabled, you have to change theses settings (defa
 
 pg_sampelog will log arround 10% of statements. It will do computation for each statement by calling `random()` function whose cost is negligible. Message output will look like (depending of your `log_line_prefix`) :
 ```
-2019-01-27 12:50:39.361 CET [27047] LOG:  Sampled query duration: 0.014 ms - SELECT 1;
+2019-01-27 12:50:39.361 CET [27047] LOG:  duration: 0.014 ms  statement: SELECT 1;
 ```
 
   * Log only 10% of transactions: `pg_sampletolog.transaction_sample_rate = 0.1`
@@ -79,8 +79,8 @@ Message output will look like (depending of your `log_line_prefix`) :
 ```
 Transaction : BEGIN; SELECT 1; SELECT 1; COMMIT;
 
-2019-01-27 12:51:40.562 CET [27069] LOG:  Sampled transaction duration: 0.008 ms - SELECT 1;
-2019-01-27 12:51:40.562 CET [27069] LOG:  Sampled transaction duration: 0.005 ms - SELECT 1;
+2019-01-27 12:51:40.562 CET [27069] LOG:  duration: 0.008 ms  statement: SELECT 1;
+2019-01-27 12:51:40.562 CET [27069] LOG:  duration: 0.005 ms  statement: SELECT 1;
 ```
 
   * Log all DDL statements: `pg_sampletolog.log_statement = 'ddl'`:
@@ -88,7 +88,7 @@ Transaction : BEGIN; SELECT 1; SELECT 1; COMMIT;
 pg_sampletolog will log **all** DDL statements, it is similar to `log_statement = ddl` parameter in Postgres. It could be useful if you want a sample of read queries but catch all ddl changes.
 
 ```
-2019-01-27 12:53:47.564 CET [27103] LOG:  Sampled ddl CREATE TABLE t1(c1 int);
+2019-01-27 12:53:47.564 CET [27103] LOG:  statement: CREATE TABLE t1(c1 int);
 ```
 
   * Log all data-modifying statements: `pg_sampletolog.log_statement = 'mod'`:
@@ -96,8 +96,8 @@ pg_sampletolog will log **all** DDL statements, it is similar to `log_statement 
 pg_sampletolog will log **all** data-modifying statements (including ddl), it is similar to `log_statement = mod` parameter in Postgres. It could be useful if you want a sample of read queries but catch all write changes.
 
 ```
-2019-01-27 12:59:54.043 CET [27160] LOG:  Sampled query duration: 0.246 ms - INSERT INTO t1 VALUES(1);
-2019-01-27 13:00:16.468 CET [27160] LOG:  Sampled ddl CREATE INDEX ON t1(c1);
+2019-01-27 12:59:54.043 CET [27160] LOG:  duration: 0.246 ms  statement: INSERT INTO t1 VALUES(1);
+2019-01-27 13:00:16.468 CET [27160] LOG:  duration: 126.851 ms  statement: CREATE INDEX ON t1(c1);
 ```
 
   * Log before execution: `pg_sampletolog.log_before_execution = on`
@@ -145,7 +145,7 @@ We got less than 10% lines of first test because pg_sampletolog don't log `BEGIN
 
 Bonus if you have `pg_stat_statements` installed, pg_sampletolog will report queryid:
 ```
-LOG:  Sampled query duration: 0.032 ms - queryid = 5892081150081336634 - UPDATE pgbench_tellers SET tbalance = tbalance + -3337 WHERE tid = 326;
+LOG:  duration: 0.032 ms  statement: /* queryid = 5892081150081336634 */ UPDATE pgbench_tellers SET tbalance = tbalance + -3337 WHERE tid = 326;
 ```
 
 It is useful to get query's parameters from a query you identified in pg_stat_statements' view.
@@ -176,16 +176,6 @@ test pg_sampletolog               ... ok
  All 1 tests passed. 
 =====================
 ```
-
-## Misc
-
-Regex to remove prefix added by `pg_sampletolog` and replace it by `statement:` (same prefix as log_statement):
-
-
-```
-sed -r 's/Sampled (query|ddl|transaction) - (Duration: [0-9]*\.[0-9]* ms)?( - )?(queryid = -?[0-9]*)?( - )?/statement: /g' inputlog.csv > output.log
-```
-
 
 ## TODO
 

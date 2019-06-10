@@ -3,116 +3,118 @@ set client_min_messages to LOG;
 set pg_sampletolog.disable_log_duration to on;
 set pg_sampletolog.statement_sample_rate to 1;
 select 1;
-LOG:  Sampled query - select 1;
+LOG:  statement: select 1;
  ?column? 
 ----------
         1
 (1 row)
 
 set pg_sampletolog.statement_sample_rate to 0;
+LOG:  statement: set pg_sampletolog.statement_sample_rate to 0;
 set pg_sampletolog.transaction_sample_rate to 1;
 select 1;
-LOG:  Sampled transaction - select 1;
+LOG:  statement: select 1;
  ?column? 
 ----------
         1
 (1 row)
 
 BEGIN;
-LOG:  Sampled transaction - BEGIN;
+LOG:  statement: BEGIN;
 SELECT 1;
-LOG:  Sampled transaction - SELECT 1;
+LOG:  statement: SELECT 1;
  ?column? 
 ----------
         1
 (1 row)
 
 create table t1(c1 int);
-LOG:  Sampled transaction - create table t1(c1 int);
+LOG:  statement: create table t1(c1 int);
 drop table t1;
-LOG:  Sampled transaction - drop table t1;
+LOG:  statement: drop table t1;
 COMMIT;
-LOG:  Sampled transaction - COMMIT;
+LOG:  statement: COMMIT;
 BEGIN;
-LOG:  Sampled transaction - BEGIN;
+LOG:  statement: BEGIN;
 SELECT 1;
-LOG:  Sampled transaction - SELECT 1;
+LOG:  statement: SELECT 1;
  ?column? 
 ----------
         1
 (1 row)
 
 create table t1(c1 int);
-LOG:  Sampled transaction - create table t1(c1 int);
+LOG:  statement: create table t1(c1 int);
 drop table t1;
-LOG:  Sampled transaction - drop table t1;
+LOG:  statement: drop table t1;
 ROLLBACK;
-LOG:  Sampled transaction - ROLLBACK;
+LOG:  statement: ROLLBACK;
 set pg_sampletolog.transaction_sample_rate to 0;
-LOG:  Sampled transaction - set pg_sampletolog.transaction_sample_rate to 0;
+LOG:  statement: set pg_sampletolog.transaction_sample_rate to 0;
 set pg_sampletolog.log_statement = ddl;
 create table t1(c1 int);
-LOG:  Sampled ddl - create table t1(c1 int);
+LOG:  statement: create table t1(c1 int);
 insert into t1 values (1);
 set pg_sampletolog.log_statement = mod;
 insert into t1 values (1);
-LOG:  Sampled query - insert into t1 values (1);
+LOG:  statement: insert into t1 values (1);
 drop table if exists t1;
-LOG:  Sampled ddl - drop table if exists t1;
+LOG:  statement: drop table if exists t1;
 set pg_sampletolog.log_before_execution to on;
 set pg_sampletolog.statement_sample_rate to 1;
 select 1;
-LOG:  Sampled query - select 1;
+LOG:  statement: select 1;
  ?column? 
 ----------
         1
 (1 row)
 
 set pg_sampletolog.statement_sample_rate to 0;
+LOG:  statement: set pg_sampletolog.statement_sample_rate to 0;
 set pg_sampletolog.transaction_sample_rate to 1;
 select 1;
-LOG:  Sampled transaction - select 1;
+LOG:  statement: select 1;
  ?column? 
 ----------
         1
 (1 row)
 
 BEGIN;
-LOG:  Sampled transaction - BEGIN;
+LOG:  statement: BEGIN;
 SELECT 1;
-LOG:  Sampled transaction - SELECT 1;
+LOG:  statement: SELECT 1;
  ?column? 
 ----------
         1
 (1 row)
 
 create table t1(c1 int);
-LOG:  Sampled transaction - create table t1(c1 int);
+LOG:  statement: create table t1(c1 int);
 drop table t1;
-LOG:  Sampled transaction - drop table t1;
+LOG:  statement: drop table t1;
 COMMIT;
-LOG:  Sampled transaction - COMMIT;
+LOG:  statement: COMMIT;
 BEGIN;
-LOG:  Sampled transaction - BEGIN;
+LOG:  statement: BEGIN;
 SELECT 1;
-LOG:  Sampled transaction - SELECT 1;
+LOG:  statement: SELECT 1;
  ?column? 
 ----------
         1
 (1 row)
 
 create table t1(c1 int);
-LOG:  Sampled transaction - create table t1(c1 int);
+LOG:  statement: create table t1(c1 int);
 drop table t1;
-LOG:  Sampled transaction - drop table t1;
+LOG:  statement: drop table t1;
 ROLLBACK;
-LOG:  Sampled transaction - ROLLBACK;
+LOG:  statement: ROLLBACK;
 set pg_sampletolog.transaction_sample_rate to 0;
-LOG:  Sampled transaction - set pg_sampletolog.transaction_sample_rate to 0;
+LOG:  statement: set pg_sampletolog.transaction_sample_rate to 0;
 set pg_sampletolog.log_statement = ddl;
 create table t1(c1 int);
-LOG:  Sampled ddl - create table t1(c1 int);
+LOG:  statement: create table t1(c1 int);
 insert into t1 values (1);
 set pg_sampletolog.log_statement = mod;
 insert into t1 values (1);
-LOG:  Sampled query - insert into t1 values (1);
+LOG:  statement: insert into t1 values (1);
