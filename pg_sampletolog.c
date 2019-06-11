@@ -25,7 +25,7 @@
 #include "access/parallel.h"
 #endif
 
-/* to log statement duration */
+/* To log statement duration */
 #include <utils/timestamp.h>
 #include <access/xact.h>
 
@@ -312,6 +312,7 @@ pgsl_check_transaction_issampled(void)
 	/* Determine if this transaction is a new one */
 	if ((pgsl_transaction_sample_rate > 0 || pgsl_transaction_issampled) &&
 	    pgsl_nesting_level == 0 && pgsl_previouslxid != MyProc->lxid) {
+
 		/* It is a new transaction, so determine if it is sampled */
 		pgsl_transaction_issampled = pgsl_transaction_sample_rate == 1 ||
 			(random() < pgsl_transaction_sample_rate * MAX_RANDOM_VALUE);
@@ -411,7 +412,7 @@ pgsl_ExecutorStart(QueryDesc * queryDesc, int eflags)
 
 	pgsl_check_transaction_issampled();
 
-	/* Always log if statement level <= pg_sampletolog.log_statement   */
+	/* Always log if statement level <= pg_sampletolog.log_statement */
 	if (!pgsl_query_issampled && GetCommandLogLevel((Node *) queryDesc->plannedstmt) <= pgsl_log_statement)
 		pgsl_query_issampled = true;
 
