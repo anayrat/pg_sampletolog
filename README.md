@@ -155,6 +155,18 @@ It is useful to get query's parameters from a query you identified in pg_stat_st
 *No supported*:
 
   * PREPARE statements are not supported.
+  * Multiple statements in a single query will give this output:
+
+```
+select pg_sleep(1)\; select pg_sleep(1);
+ pg_sleep 
+----------
+ 
+(1 row)
+
+2019-06-07 23:07:24.556 CEST [26519] LOG:  duration: 1005.733 ms  statement: select pg_sleep(1); select pg_sleep(1);
+2019-06-07 23:07:25.558 CEST [26519] LOG:  duration: 2006.789 ms  statement: select pg_sleep(1); select pg_sleep(1);
+```
 
 ## Testing
 
@@ -184,6 +196,11 @@ test pg_sampletolog               ... ok
 ## Author
 
 Adrien NAYRAT
+
+## Contributors
+
+  * Gilles Darold
+  * Julien Rouhaud
 
 ## Licence
 
