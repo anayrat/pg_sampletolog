@@ -32,12 +32,12 @@
 PG_MODULE_MAGIC;
 
 /* GUC variables */
-static double	pgsl_stmt_sample_rate = 0;
-static double	pgsl_transaction_sample_rate = 0;
+static double pgsl_stmt_sample_rate = 0;
+static double pgsl_transaction_sample_rate = 0;
 static int	pgsl_log_level = LOG;
 static int	pgsl_log_statement = LOGSTMT_NONE;
-static bool	pgsl_log_before_execution = false;
-static bool	pgsl_disable_log_duration = false;
+static bool pgsl_log_before_execution = false;
+static bool pgsl_disable_log_duration = false;
 
 
 static const struct config_enum_entry loglevel_options[] = {
@@ -75,10 +75,10 @@ static ExecutorFinish_hook_type prev_ExecutorFinish = NULL;
 static ExecutorEnd_hook_type prev_ExecutorEnd = NULL;
 
 /* Is the current query sampled, per backend */
-static bool	pgsl_query_issampled = false;
+static bool pgsl_query_issampled = false;
 
 /* Is the current transaction sampled */
-static bool	pgsl_transaction_issampled = false;
+static bool pgsl_transaction_issampled = false;
 
 /*
  * Store previous LocalTransactionXid: > src/include/storage/lock.h: >
@@ -97,40 +97,40 @@ void		_PG_init(void);
 void		_PG_fini(void);
 
 static void
-pgsl_ProcessUtility(
+			pgsl_ProcessUtility(
 #if PG_VERSION_NUM >= 100000
-		    PlannedStmt * pstmt,
+								PlannedStmt *pstmt,
 #else
-		    Node * parsetree,
+								Node *parsetree,
 #endif
-		    const char *queryString,
-		    ProcessUtilityContext context,
-		    ParamListInfo params,
+								const char *queryString,
+								ProcessUtilityContext context,
+								ParamListInfo params,
 #if PG_VERSION_NUM >= 100000
-		    QueryEnvironment * queryEnv,
+								QueryEnvironment *queryEnv,
 #endif
-		    DestReceiver * dest,
-		    char *completionTag);
-static void	pgsl_ExecutorStart(QueryDesc * queryDesc, int eflags);
+								DestReceiver *dest,
+								char *completionTag);
+static void pgsl_ExecutorStart(QueryDesc *queryDesc, int eflags);
 static void
-pgsl_ExecutorRun(QueryDesc * queryDesc,
-		 ScanDirection direction,
+			pgsl_ExecutorRun(QueryDesc *queryDesc,
+							 ScanDirection direction,
 #if PG_VERSION_NUM >= 90600
-		 uint64 count
+							 uint64 count
 #else
-		 long count
+							 long count
 #endif
 #if PG_VERSION_NUM >= 100000
-		 ,bool execute_once
+							 ,bool execute_once
 #endif
 );
-static void	pgsl_ExecutorFinish(QueryDesc * queryDesc);
-static void	pgsl_ExecutorEnd(QueryDesc * queryDesc);
+static void pgsl_ExecutorFinish(QueryDesc *queryDesc);
+static void pgsl_ExecutorEnd(QueryDesc *queryDesc);
 
-static void	pgsl_log_report(QueryDesc * queryDesc);
-static void	pgsl_check_transaction_issampled(void);
+static void pgsl_log_report(QueryDesc *queryDesc);
+static void pgsl_check_transaction_issampled(void);
 
-static char   * pgsl_get_duration(void);
+static char *pgsl_get_duration(void);
 
 /*
  * Module load callback
@@ -140,83 +140,84 @@ _PG_init(void)
 {
 	/* Define custom GUC variables. */
 	DefineCustomRealVariable("pg_sampletolog.statement_sample_rate",
-				 "Fraction of queries to log",
-		"Use a value between 0.0 (never log) and 1.0 (always log).",
-				 &pgsl_stmt_sample_rate,
-				 0.0,
-				 0.0,
-				 1.0,
-				 PGC_SUSET,
-				 0,
-				 NULL,
-				 NULL,
-				 NULL);
+							 "Fraction of queries to log",
+							 "Use a value between 0.0 (never log) and 1.0 (always log).",
+							 &pgsl_stmt_sample_rate,
+							 0.0,
+							 0.0,
+							 1.0,
+							 PGC_SUSET,
+							 0,
+							 NULL,
+							 NULL,
+							 NULL);
 
 	DefineCustomRealVariable("pg_sampletolog.transaction_sample_rate",
-				 "Fraction of transactions to log",
-		"Use a value between 0.0 (never log) and 1.0 (always log).",
-				 &pgsl_transaction_sample_rate,
-				 0.0,
-				 0.0,
-				 1.0,
-				 PGC_SUSET,
-				 0,
-				 NULL,
-				 NULL,
-				 NULL);
+							 "Fraction of transactions to log",
+							 "Use a value between 0.0 (never log) and 1.0 (always log).",
+							 &pgsl_transaction_sample_rate,
+							 0.0,
+							 0.0,
+							 1.0,
+							 PGC_SUSET,
+							 0,
+							 NULL,
+							 NULL,
+							 NULL);
 
 	DefineCustomEnumVariable("pg_sampletolog.log_level",
-				 "Log level for the plan.",
-				 NULL,
-				 &pgsl_log_level,
-				 LOG,
-				 loglevel_options,
-				 PGC_SUSET,
-				 0,
-				 NULL,
-				 NULL,
-				 NULL);
+							 "Log level for the plan.",
+							 NULL,
+							 &pgsl_log_level,
+							 LOG,
+							 loglevel_options,
+							 PGC_SUSET,
+							 0,
+							 NULL,
+							 NULL,
+							 NULL);
 
 	DefineCustomEnumVariable("pg_sampletolog.log_statement",
-				 "Log all statements of this type.",
-				 "Only mod and ddl have effect.",
-				 &pgsl_log_statement,
-				 LOGSTMT_NONE,
-				 logstatement_options,
-				 PGC_SUSET,
-				 0,
-				 NULL,
-				 NULL,
-				 NULL);
+							 "Log all statements of this type.",
+							 "Only mod and ddl have effect.",
+							 &pgsl_log_statement,
+							 LOGSTMT_NONE,
+							 logstatement_options,
+							 PGC_SUSET,
+							 0,
+							 NULL,
+							 NULL,
+							 NULL);
 
 	DefineCustomBoolVariable("pg_sampletolog.log_before_execution",
-				 "Log statement before execution.",
-				 NULL,
-				 &pgsl_log_before_execution,
-				 false,
-				 PGC_SUSET,
-				 0,
-				 NULL,
-				 NULL,
-				 NULL);
+							 "Log statement before execution.",
+							 NULL,
+							 &pgsl_log_before_execution,
+							 false,
+							 PGC_SUSET,
+							 0,
+							 NULL,
+							 NULL,
+							 NULL);
 
 	DefineCustomBoolVariable("pg_sampletolog.disable_log_duration",
-			       "Disable duration in log, used for testing.",
-				 NULL,
-				 &pgsl_disable_log_duration,
-				 false,
-				 PGC_SUSET,
-				 0,
-				 NULL,
-				 NULL,
-				 NULL);
+							 "Disable duration in log, used for testing.",
+							 NULL,
+							 &pgsl_disable_log_duration,
+							 false,
+							 PGC_SUSET,
+							 0,
+							 NULL,
+							 NULL,
+							 NULL);
 
 
 	EmitWarningsOnPlaceholders("pg_sampletolog");
 
 	/* Install hooks only on leader. */
 #if PG_VERSION_NUM >= 90600
-	if (!IsParallelWorker()) {
+	if (!IsParallelWorker())
+	{
 #endif
 		prev_ProcessUtility = ProcessUtility_hook;
 		ProcessUtility_hook = pgsl_ProcessUtility;
@@ -241,7 +242,8 @@ _PG_fini(void)
 {
 	/* Uninstall hooks only on leader. */
 #if PG_VERSION_NUM >= 90600
-	if (!IsParallelWorker()) {
+	if (!IsParallelWorker())
+	{
 #endif
 		ProcessUtility_hook = prev_ProcessUtility;
 		ExecutorStart_hook = prev_ExecutorStart;
@@ -256,10 +258,10 @@ _PG_fini(void)
 static char *
 pgsl_get_duration(void)
 {
-	char		*duration = NULL;
-	long            secs;
-	int             usecs;
-	int             msecs;
+	char	   *duration = NULL;
+	long		secs;
+	int			usecs;
+	int			msecs;
 
 	duration = palloc0(sizeof(char) * 32);
 
@@ -274,34 +276,37 @@ pgsl_get_duration(void)
 }
 
 void
-pgsl_log_report(QueryDesc * queryDesc)
+pgsl_log_report(QueryDesc *queryDesc)
 {
 
 	char		message[70];
 
 	/* Log duration and/or queryid if available */
-	if (queryDesc->plannedstmt->queryId) {
+	if (queryDesc->plannedstmt->queryId)
+	{
 		snprintf(message, 70, "%sstatement: /* queryid = %ld */",
-				pgsl_get_duration(),
+				 pgsl_get_duration(),
 #if PG_VERSION_NUM >= 110000
 				 queryDesc->plannedstmt->queryId);
 #else
 				 (uint64) queryDesc->plannedstmt->queryId);
 #endif
-	} else {
+	}
+	else
+	{
 		snprintf(message, 70, "%sstatement:", pgsl_get_duration());
 	}
 
 	/*
-	 * We emit different message depending on whether logging is
-	 * triggered by query sampling or by transaction sampling.
+	 * We emit different message depending on whether logging is triggered by
+	 * query sampling or by transaction sampling.
 	 */
 	if (pgsl_query_issampled || pgsl_transaction_issampled)
 	{
 		ereport(pgsl_log_level,
-			(errmsg("%s %s",
-				message, queryDesc->sourceText),
-			 errhidestmt(true)));
+				(errmsg("%s %s",
+						message, queryDesc->sourceText),
+				 errhidestmt(true)));
 		pgsl_query_issampled = false;
 	}
 }
@@ -311,7 +316,8 @@ pgsl_check_transaction_issampled(void)
 {
 	/* Determine if this transaction is a new one */
 	if ((pgsl_transaction_sample_rate > 0 || pgsl_transaction_issampled) &&
-	    pgsl_nesting_level == 0 && pgsl_previouslxid != MyProc->lxid) {
+		pgsl_nesting_level == 0 && pgsl_previouslxid != MyProc->lxid)
+	{
 
 		/* It is a new transaction, so determine if it is sampled */
 		pgsl_transaction_issampled = pgsl_transaction_sample_rate == 1 ||
@@ -326,18 +332,18 @@ pgsl_check_transaction_issampled(void)
 static void
 pgsl_ProcessUtility(
 #if PG_VERSION_NUM >= 100000
-		    PlannedStmt * pstmt,
+					PlannedStmt *pstmt,
 #else
-		    Node * parsetree,
+					Node *parsetree,
 #endif
-		    const char *queryString,
-		    ProcessUtilityContext context,
-		    ParamListInfo params,
+					const char *queryString,
+					ProcessUtilityContext context,
+					ParamListInfo params,
 #if PG_VERSION_NUM >= 100000
-		    QueryEnvironment * queryEnv,
+					QueryEnvironment *queryEnv,
 #endif
-		    DestReceiver * dest,
-		    char *completionTag)
+					DestReceiver *dest,
+					char *completionTag)
 {
 #if PG_VERSION_NUM < 100000
 	PlannedStmt *pstmt;
@@ -349,7 +355,7 @@ pgsl_ProcessUtility(
 	{
 		ereport(pgsl_log_level,
 				(errmsg("%sstatement: %s", pgsl_get_duration(),
-					queryString),
+						queryString),
 				 errhidestmt(true)));
 	}
 	else
@@ -362,7 +368,7 @@ pgsl_ProcessUtility(
 		{
 			ereport(pgsl_log_level,
 					(errmsg("%sstatement: %s", pgsl_get_duration(),
-						queryString),
+							queryString),
 					 errhidestmt(true)));
 		}
 	}
@@ -370,31 +376,31 @@ pgsl_ProcessUtility(
 	if (prev_ProcessUtility)
 		(*prev_ProcessUtility) (
 #if PG_VERSION_NUM >= 100000
-					pstmt,
+								pstmt,
 #else
-					parsetree,
+								parsetree,
 #endif
-					queryString,
-					context,
-					params,
+								queryString,
+								context,
+								params,
 #if PG_VERSION_NUM >= 100000
-					queryEnv,
+								queryEnv,
 #endif
-					dest, completionTag);
+								dest, completionTag);
 	else
 		standard_ProcessUtility(
 #if PG_VERSION_NUM >= 100000
-					pstmt,
+								pstmt,
 #else
-					parsetree,
+								parsetree,
 #endif
-					queryString,
-					context,
-					params,
+								queryString,
+								context,
+								params,
 #if PG_VERSION_NUM >= 100000
-					queryEnv,
+								queryEnv,
 #endif
-					dest, completionTag);
+								dest, completionTag);
 
 }
 
@@ -402,13 +408,13 @@ pgsl_ProcessUtility(
  * ExecutorStart hook: start up log sampling if needed
  */
 static void
-pgsl_ExecutorStart(QueryDesc * queryDesc, int eflags)
+pgsl_ExecutorStart(QueryDesc *queryDesc, int eflags)
 {
 
 	/* Determine if statement of this transaction is sampled */
 	if (pgsl_stmt_sample_rate > 0 && pgsl_nesting_level == 0)
 		pgsl_query_issampled |= pgsl_query_issampled || (pgsl_stmt_sample_rate == 1 ||
-		     (random() < pgsl_stmt_sample_rate * MAX_RANDOM_VALUE));
+														 (random() < pgsl_stmt_sample_rate * MAX_RANDOM_VALUE));
 
 	pgsl_check_transaction_issampled();
 
@@ -416,7 +422,8 @@ pgsl_ExecutorStart(QueryDesc * queryDesc, int eflags)
 	if (!pgsl_query_issampled && GetCommandLogLevel((Node *) queryDesc->plannedstmt) <= pgsl_log_statement)
 		pgsl_query_issampled = true;
 
-	if (pgsl_log_before_execution) {
+	if (pgsl_log_before_execution)
+	{
 		pgsl_log_report(queryDesc);
 	}
 
@@ -432,15 +439,15 @@ pgsl_ExecutorStart(QueryDesc * queryDesc, int eflags)
  * ExecutorRun hook: all we need do is track nesting depth
  */
 static void
-pgsl_ExecutorRun(QueryDesc * queryDesc,
-		 ScanDirection direction,
+pgsl_ExecutorRun(QueryDesc *queryDesc,
+				 ScanDirection direction,
 #if PG_VERSION_NUM >= 90600
-		 uint64 count
+				 uint64 count
 #else
-		 long count
+				 long count
 #endif
 #if PG_VERSION_NUM >= 100000
-		 ,bool execute_once
+				 ,bool execute_once
 #endif
 )
 {
@@ -473,7 +480,7 @@ pgsl_ExecutorRun(QueryDesc * queryDesc,
  * ExecutorFinish hook: all we need do is track nesting depth
  */
 static void
-pgsl_ExecutorFinish(QueryDesc * queryDesc)
+pgsl_ExecutorFinish(QueryDesc *queryDesc)
 {
 	pgsl_nesting_level++;
 	PG_TRY();
@@ -497,10 +504,10 @@ pgsl_ExecutorFinish(QueryDesc * queryDesc)
  * ExecutorEnd hook: log statement if needed
  */
 static void
-pgsl_ExecutorEnd(QueryDesc * queryDesc)
+pgsl_ExecutorEnd(QueryDesc *queryDesc)
 {
 	if (!pgsl_log_before_execution &&
-			(pgsl_query_issampled || pgsl_transaction_issampled))
+		(pgsl_query_issampled || pgsl_transaction_issampled))
 	{
 		pgsl_log_report(queryDesc);
 	}
