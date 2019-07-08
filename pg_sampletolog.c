@@ -62,6 +62,12 @@ static const struct config_enum_entry logstatement_options[] = {
 	{NULL, 0, false}
 };
 
+struct Duration
+{
+	long		secs;
+	int			usecs;
+	int			msecs;
+};
 
 /* Current nesting depth of ExecutorRun calls */
 static int	pgsl_nesting_level = 0;
@@ -129,8 +135,8 @@ static void pgsl_ExecutorEnd(QueryDesc *queryDesc);
 
 static void pgsl_log_report(QueryDesc *queryDesc);
 static void pgsl_check_transaction_issampled(void);
-
-static char *pgsl_get_duration(void);
+static struct Duration pgsl_get_duration(void);
+static char *pgsl_get_duration_str(void);
 
 /*
  * Module load callback
@@ -140,7 +146,7 @@ _PG_init(void)
 {
 	/* Define custom GUC variables. */
 	DefineCustomRealVariable("pg_sampletolog.statement_sample_rate",
-							 "Fraction of queries to log",
+							 "Fraction of queries to log.",
 							 "Use a value between 0.0 (never log) and 1.0 (always log).",
 							 &pgsl_stmt_sample_rate,
 							 0.0,
@@ -153,7 +159,7 @@ _PG_init(void)
 							 NULL);
 
 	DefineCustomRealVariable("pg_sampletolog.transaction_sample_rate",
-							 "Fraction of transactions to log",
+							 "Fraction of transactions to log.",
 							 "Use a value between 0.0 (never log) and 1.0 (always log).",
 							 &pgsl_transaction_sample_rate,
 							 0.0,
@@ -166,7 +172,7 @@ _PG_init(void)
 							 NULL);
 
 	DefineCustomEnumVariable("pg_sampletolog.log_level",
-							 "Log level for the plan.",
+							 "Log level for sampled queries.",
 							 NULL,
 							 &pgsl_log_level,
 							 LOG,
@@ -255,23 +261,37 @@ _PG_fini(void)
 #endif
 }
 
-static char *
+
+static struct Duration
 pgsl_get_duration(void)
 {
-	char	   *duration = NULL;
-	long		secs;
-	int			usecs;
-	int			msecs;
+	struct Duration d;
 
-	duration = palloc0(sizeof(char) * 32);
+	d.secs = 0;
+	d.usecs = 0;
+	d.msecs = 0;
+
+	TimestampDifference(GetCurrentStatementStartTimestamp(), GetCurrentTimestamp(), &d.secs, &d.usecs);
+	d.msecs = d.usecs / 1000;
+
+	return d;
+}
+
+static char *
+pgsl_get_duration_str(void)
+{
+	char	   *duration_str = NULL;
+	struct Duration d;
+
+	duration_str = palloc0(sizeof(char) * 32);
+
 
 	if (!pgsl_disable_log_duration)
 	{
-		TimestampDifference(GetCurrentStatementStartTimestamp(), GetCurrentTimestamp(), &secs, &usecs);
-		msecs = usecs / 1000;
-		snprintf(duration, 30, "duration: %ld.%03d ms  ", secs * 1000 + msecs, usecs % 1000);
+		d = pgsl_get_duration();
+		snprintf(duration_str, 30, "duration: %ld.%03d ms  ", d.secs * 1000 + d.msecs, d.usecs % 1000);
 	}
-	return duration;
+	return duration_str;
 
 }
 
@@ -285,7 +305,7 @@ pgsl_log_report(QueryDesc *queryDesc)
 	if (queryDesc->plannedstmt->queryId)
 	{
 		snprintf(message, 70, "%sstatement: /* queryid = %ld */",
-				 pgsl_get_duration(),
+				 pgsl_get_duration_str(),
 #if PG_VERSION_NUM >= 110000
 				 queryDesc->plannedstmt->queryId);
 #else
@@ -294,21 +314,16 @@ pgsl_log_report(QueryDesc *queryDesc)
 	}
 	else
 	{
-		snprintf(message, 70, "%sstatement:", pgsl_get_duration());
+		snprintf(message, 70, "%sstatement:", pgsl_get_duration_str());
 	}
 
-	/*
-	 * We emit different message depending on whether logging is triggered by
-	 * query sampling or by transaction sampling.
-	 */
-	if (pgsl_query_issampled || pgsl_transaction_issampled)
-	{
-		ereport(pgsl_log_level,
-				(errmsg("%s %s",
-						message, queryDesc->sourceText),
-				 errhidestmt(true)));
-		pgsl_query_issampled = false;
-	}
+	ereport(pgsl_log_level,
+			(errmsg("%s %s",
+					message, queryDesc->sourceText),
+			 errhidestmt(true)));
+
+	/* Ensure we do not log this query again */
+	pgsl_query_issampled = false;
 }
 
 void
@@ -349,28 +364,20 @@ pgsl_ProcessUtility(
 	PlannedStmt *pstmt;
 #endif
 
+	/* Log query if this transaction is sampled */
 	pgsl_check_transaction_issampled();
 
-	if (pgsl_transaction_issampled)
+#if PG_VERSION_NUM >= 100000
+	if (GetCommandLogLevel((Node *) pstmt) <= pgsl_log_statement || pgsl_stmt_sample_rate == 1
+#else
+	if (GetCommandLogLevel(parsetree) <= pgsl_log_statement || pgsl_stmt_sample_rate == 1
+#endif
+		|| pgsl_transaction_issampled)
 	{
 		ereport(pgsl_log_level,
-				(errmsg("%sstatement: %s", pgsl_get_duration(),
+				(errmsg("%sstatement: %s", pgsl_get_duration_str(),
 						queryString),
 				 errhidestmt(true)));
-	}
-	else
-	{
-#if PG_VERSION_NUM >= 100000
-		if (GetCommandLogLevel((Node *) pstmt) <= pgsl_log_statement || pgsl_stmt_sample_rate == 1)
-#else
-		if (GetCommandLogLevel(parsetree) <= pgsl_log_statement || pgsl_stmt_sample_rate == 1)
-#endif
-		{
-			ereport(pgsl_log_level,
-					(errmsg("%sstatement: %s", pgsl_get_duration(),
-							queryString),
-					 errhidestmt(true)));
-		}
 	}
 
 	if (prev_ProcessUtility)
@@ -422,7 +429,8 @@ pgsl_ExecutorStart(QueryDesc *queryDesc, int eflags)
 	if (!pgsl_query_issampled && GetCommandLogLevel((Node *) queryDesc->plannedstmt) <= pgsl_log_statement)
 		pgsl_query_issampled = true;
 
-	if (pgsl_log_before_execution)
+	if (pgsl_log_before_execution &&
+		(pgsl_query_issampled || pgsl_transaction_issampled))
 	{
 		pgsl_log_report(queryDesc);
 	}
