@@ -34,6 +34,7 @@ PG_MODULE_MAGIC;
 /* GUC variables */
 static double pgsl_stmt_sample_rate = 0;
 static double pgsl_transaction_sample_rate = 0;
+static int	pgsl_stmt_sample_limit = -1;
 static int	pgsl_log_level = LOG;
 static int	pgsl_log_statement = LOGSTMT_NONE;
 static bool pgsl_log_before_execution = false;
@@ -135,6 +136,7 @@ static void pgsl_ExecutorEnd(QueryDesc *queryDesc);
 
 static void pgsl_log_report(QueryDesc *queryDesc);
 static void pgsl_check_transaction_issampled(void);
+static bool pgsl_stmt_limit(void);
 static struct Duration pgsl_get_duration(void);
 static char *pgsl_get_duration_str(void);
 
@@ -170,6 +172,19 @@ _PG_init(void)
 							 NULL,
 							 NULL,
 							 NULL);
+
+	DefineCustomIntVariable("pg_sampletolog.statement_sample_limit",
+							"Always log queries exceeding statement_sample_limit.",
+							"Useful to disable sampling for long queriesi.",
+							&pgsl_stmt_sample_limit,
+							-1,
+							-1,
+							INT_MAX,
+							PGC_SUSET,
+							GUC_UNIT_MS,
+							NULL,
+							NULL,
+							NULL);
 
 	DefineCustomEnumVariable("pg_sampletolog.log_level",
 							 "Log level for sampled queries.",
@@ -339,6 +354,24 @@ pgsl_check_transaction_issampled(void)
 			(random() < pgsl_transaction_sample_rate * MAX_RANDOM_VALUE);
 		pgsl_previouslxid = MyProc->lxid;
 	}
+}
+
+/*
+ * Always log statements whose duration exceed statement_sample_limit
+ */
+
+bool
+pgsl_stmt_limit(void)
+{
+	struct Duration d;
+
+	d = pgsl_get_duration();
+
+	if (pgsl_nesting_level == 0 &&
+		(pgsl_transaction_sample_rate > 0 || pgsl_stmt_sample_rate > 0) &&
+		(d.secs * 1000 + d.msecs) >= pgsl_stmt_sample_limit && pgsl_stmt_sample_limit != -1)
+		return true;
+	return false;
 }
 
 /*
@@ -515,7 +548,7 @@ static void
 pgsl_ExecutorEnd(QueryDesc *queryDesc)
 {
 	if (!pgsl_log_before_execution &&
-		(pgsl_query_issampled || pgsl_transaction_issampled))
+		(pgsl_query_issampled || pgsl_transaction_issampled || pgsl_stmt_limit()))
 	{
 		pgsl_log_report(queryDesc);
 	}

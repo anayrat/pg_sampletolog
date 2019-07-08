@@ -42,6 +42,7 @@ select name from pg_settings where name like 'pg_sampletolog%';
  pg_sampletolog.log_before_execution
  pg_sampletolog.log_level
  pg_sampletolog.log_statement
+ pg_sampletolog.statement_sample_limit
  pg_sampletolog.statement_sample_rate
  pg_sampletolog.transaction_sample_rate
 (6 rows)
@@ -57,6 +58,7 @@ By default, pg_sampletolog is disabled, you have to change theses settings (defa
   * *pg_sampletolog.log_level* (`LOG`): Control log severity level. Refer to PostgreSQL documentation for their meaning : [Message Severity Levels](https://www.postgresql.org/docs/current/runtime-config-logging.html#RUNTIME-CONFIG-SEVERITY-LEVELS)
   * *pg_sampletolog.statement_sample_rate* (`0`): Control fraction of statements to report in log.
   * *pg_sampletolog.transaction_sample_rate* (`0`): Control fraction of transactions to report in log.
+  * *pg_sampletolog.statement_sample_limit* (`-1`): Always log statements whose duration exceed this limit.
   * *pg_sampletolog.log_statement* `none`): Allow to log *all* DDL and/or MOD statements.
   * *pg_sampletolog.log_before_execution* (`false`): Control to log statements before or after execution.
   * *pg_sampletolog.disable_log_duration* (`false`): Disable duration reporting (mainly used for tests).
@@ -82,6 +84,10 @@ Transaction : BEGIN; SELECT 1; SELECT 1; COMMIT;
 2019-01-27 12:51:40.562 CET [27069] LOG:  duration: 0.008 ms  statement: SELECT 1;
 2019-01-27 12:51:40.562 CET [27069] LOG:  duration: 0.005 ms  statement: SELECT 1;
 ```
+
+  * Do not sample statement if execution exceed 100ms: `pg_sampletolog.statement_sample_limit = '100ms'`
+
+It can be useful if you do not want sampling (i.e log all occurences) for long running queries. Note that it is possible only if either `pg_sampletolog.statement_sample_rate` or `pg_sampletolog.transaction_sample_rate` are > 0.
 
   * Log all DDL statements: `pg_sampletolog.log_statement = 'ddl'`:
 
